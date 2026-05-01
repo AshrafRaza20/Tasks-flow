@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>TaskFlow — Team Task Manager</title>
+<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0d0f14;
+    --bg2: #13161e;
+    --bg3: #1a1d28;
+    --surface: #1e2230;
+    --surface2: #252a3a;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.12);
+    --text: #f0f2f7;
+    --text2: #8892aa;
+    --text3: #555e75;
+    --accent: #5b8fff;
+    --accent2: #3d6fe8;
+    --accent-soft: rgba(91,143,255,0.12);
+    --green: #34d399;
+    --green-soft: rgba(52,211,153,0.12);
+    --amber: #fbbf24;
+    --amber-soft: rgba(251,191,36,0.12);
+    --red: #f87171;
+    --red-soft: rgba(248,113,113,0.12);
+    --purple: #a78bfa;
+    --purple-soft: rgba(167,139,250,0.12);
+    --font: 'DM Sans', sans-serif;
+    --mono: 'DM Mono', monospace;
+    --r: 8px;
+    --r2: 12px;
+    --r3: 16px;
+    --sh: 0 4px 24px rgba(0,0,0,0.4);
+  }
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); font-size: 15px; }
+  #root { height: 100%; }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+  input, textarea, select {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 14px;
+    padding: 10px 14px;
+    width: 100%;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+  select option { background: var(--surface); }
+  button { cursor: pointer; font-family: var(--font); border: none; outline: none; }
+  label { font-size: 13px; color: var(--text2); display: block; margin-bottom: 6px; font-weight: 500; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback, createContext, useContext } = React;
+
+/* ─── DATA STORE ─── */
+const initData = () => {
+  const saved = localStorage.getItem('taskflow_v2');
+  if (saved) return JSON.parse(saved);
+  const adminId = 'u1'; const memberId = 'u2'; const member2Id = 'u3';
+  const now = Date.now();
+  return {
+    users: [
+      { id: adminId, name: 'Alex Chen', email: 'admin@demo.com', password: 'admin123', role: 'Admin', avatar: 'AC', color: '#5b8fff' },
+      { id: memberId, name: 'Jordan Lee', email: 'member@demo.com', password: 'member123', role: 'Member', avatar: 'JL', color: '#34d399' },
+      { id: member2Id, name: 'Sam Rivera', email: 'sam@demo.com', password: 'sam123', role: 'Member', avatar: 'SR', color: '#a78bfa' },
+    ],
+    projects: [
+      { id: 'p1', name: 'Website Redesign', description: 'Full redesign of company website', color: '#5b8fff', members: [adminId, memberId, member2Id], createdBy: adminId, createdAt: now - 86400000*5 },
+      { id: 'p2', name: 'Mobile App MVP', description: 'Build core features for mobile launch', color: '#34d399', members: [adminId, member2Id], createdBy: adminId, createdAt: now - 86400000*3 },
+    ],
+    tasks: [
+      { id: 't1', projectId: 'p1', title: 'Design new homepage layout', description: 'Create wireframes and mockups for homepage', status: 'Done', priority: 'High', assigneeId: memberId, createdBy: adminId, dueDate: new Date(now - 86400000).toISOString().split('T')[0], createdAt: now - 86400000*4 },
+      { id: 't2', projectId: 'p1', title: 'Implement responsive navigation', description: 'Mobile-first nav with hamburger menu', status: 'In Progress', priority: 'High', assigneeId: memberId, createdBy: adminId, dueDate: new Date(now + 86400000*2).toISOString().split('T')[0], createdAt: now - 86400000*3 },
+      { id: 't3', projectId: 'p1', title: 'Write content for About page', description: 'Draft and edit about us content', status: 'Todo', priority: 'Medium', assigneeId: member2Id, createdBy: adminId, dueDate: new Date(now + 86400000*5).toISOString().split('T')[0], createdAt: now - 86400000*2 },
+      { id: 't4', projectId: 'p1', title: 'SEO optimization', description: 'Meta tags, sitemap, and page speed', status: 'Todo', priority: 'Low', assigneeId: adminId, createdBy: adminId, dueDate: new Date(now + 86400000*10).toISOString().split('T')[0], createdAt: now - 86400000 },
+      { id: 't5', projectId: 'p2', title: 'User authentication flow', description: 'Login, signup, password reset', status: 'In Progress', priority: 'High', assigneeId: member2Id, createdBy: adminId, dueDate: new Date(now + 86400000*3).toISOString().split('T')[0], createdAt: now - 86400000*2 },
+      { id: 't6', projectId: 'p2', title: 'Push notifications setup', description: 'Firebase push notifications integration', status: 'Todo', priority: 'Medium', assigneeId: adminId, createdBy: adminId, dueDate: new Date(now - 86400000*2).toISOString().split('T')[0], createdAt: now - 86400000 },
+    ]
+  };
+};
+
+const AppCtx = createContext(null);
+
+/* ─── UTILS ─── */
+const uid = () => Math.random().toString(36).slice(2);
+const today = () => new Date().toISOString().split('T')[0];
+const isOverdue = (task) => task.dueDate && task.dueDate < today() && task.status !== 'Done';
+const STATUS_COLORS = { 'Todo': '--text2', 'In Progress': '--accent', 'Done': '--green' };
+const STATUS_BG = { 'Todo': 'var(--surface2)', 'In Progress': 'var(--accent-soft)', 'Done': 'var(--green-soft)' };
+const STATUS_TEXT = { 'Todo': 'var(--text2)', 'In Progress': 'var(--accent)', 'Done': 'var(--green)' };
+const PRIORITY_COLOR = { 'High': 'var(--red)', 'Medium': 'var(--amber)', 'Low': 'var(--green)' };
+const PRIORITY_BG = { 'High': 'var(--red-soft)', 'Medium': 'var(--amber-soft)', 'Low': 'var(--green-soft)' };
+
+/* ─── COMPONENTS ─── */
+const Avatar = ({ user, size = 32 }) => (
+  <div style={{
+    width: size, height: size, borderRadius: '50%',
+    background: user?.color + '22' || '#5b8fff22',
+    border: `1.5px solid ${user?.color || '#5b8fff'}44`,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    fontSize: size * 0.36, fontWeight: 600, color: user?.color || '#5b8fff',
+    flexShrink: 0, fontFamily: 'var(--mono)'
+  }}>{user?.avatar || '?'}</div>
+);
+
+const Badge = ({ label, bg, color }) => (
+  <span style={{
+    display: 'inline-flex', alignItems: 'center', padding: '3px 10px',
+    borderRadius: 20, fontSize: 12, fontWeight: 500,
+    background: bg, color
+  }}>{label}</span>
+);
+
+const Btn = ({ children, onClick, variant = 'primary', size = 'md', disabled, style: s }) => {
+  const styles = {
+    primary: { background: 'var(--accent)', color: '#fff', border: 'none' },
+    ghost: { background: 'transparent', color: 'var(--text2)', border: '1px solid var(--border)' },
+    danger: { background: 'var(--red-soft)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.2)' },
+    success: { background: 'var(--green-soft)', color: 'var(--green)', border: '1px solid rgba(52,211,153,0.2)' },
+  };
+  const sizes = { sm: { padding: '6px 14px', fontSize: 13 }, md: { padding: '9px 18px', fontSize: 14 }, lg: { padding: '12px 24px', fontSize: 15 } };
+  return (
+    <button onClick={onClick} disabled={disabled} style={{
+      borderRadius: 'var(--r)', fontWeight: 500, fontFamily: 'var(--font)',
+      cursor: disabled ? 'not-allowed', opacity: disabled ? 0.5 : 1,
+      transition: 'all 0.15s', display: 'inline-flex', alignItems: 'center', gap: 6,
+      ...styles[variant], ...sizes[size], ...s
+    }} onMouseEnter={e => !disabled && (e.currentTarget.style.opacity = '0.85')}
+       onMouseLeave={e => !disabled && (e.currentTarget.style.opacity = '1')}
+    >{children}</button>
+  );
+};
+
+const Modal = ({ title, onClose, children, width = 480 }) => (
+  <div style={{
+    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20
+  }} onClick={e => e.target === e.currentTarget && onClose()}>
+    <div style={{
+      background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 'var(--r3)',
+      width: '100%', maxWidth: width, maxHeight: '90vh', overflow: 'auto', boxShadow: 'var(--sh)'
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 24px 16px', borderBottom: '1px solid var(--border)' }}>
+        <h2 style={{ fontSize: 16, fontWeight: 600 }}>{title}</h2>
+        <button onClick={onClose} style={{ background: 'none', color: 'var(--text2)', fontSize: 20, padding: '4px 8px', borderRadius: 'var(--r)' }}>×</button>
+      </div>
+      <div style={{ padding: 24 }}>{children}</div>
+    </div>
+  </div>
+);
+
+const Field = ({ label, children }) => (
+  <div style={{ marginBottom: 16 }}>
+    {label && <label>{label}</label>}
+    {children}
+  </div>
+);
+
+/* ─── LOGIN ─── */
+const Login = ({ onLogin }) => {
+  const [email, setEmail] = useState('admin@demo.com');
+  const [pass, setPass] = useState('admin123');
+  const [err, setErr] = useState('');
+  const { data } = useContext(AppCtx);
+
+  const submit = () => {
+    const u = data.users.find(u => u.email === email && u.password === pass);
+    if (u) onLogin(u);
+    else setErr('Invalid credentials. Try admin@demo.com / admin123');
+  };
+
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: 20 }}>
+      <div style={{ width: '100%', maxWidth: 400 }}>
+        <div style={{ textAlign: 'center', marginBottom: 40 }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="18" height="18" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+            </div>
+            <span style={{ fontSize: 22, fontWeight: 700, letterSpacing: -0.5 }}>TaskFlow</span>
+          </div>
+          <p style={{ color: 'var(--text2)', fontSize: 14 }}>Sign in to your workspace</p>
+        </div>
+        <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 'var(--r3)', padding: 28 }}>
+          <Field label="Email"><input value={email} onChange={e => setEmail(e.target.value)} type="email" /></Field>
+          <Field label="Password"><input value={pass} onChange={e => setPass(e.target.value)} type="password" onKeyDown={e => e.key === 'Enter' && submit()} /></Field>
+          {err && <p style={{ color: 'var(--red)', fontSize: 13, marginBottom: 16, padding: '10px 14px', background: 'var(--red-soft)', borderRadius: 'var(--r)' }}>{err}</p>}
+          <Btn onClick={submit} size="lg" style={{ width: '100%', justifyContent: 'center' }}>Sign In</Btn>
+          <div style={{ marginTop: 20, padding: '12px 14px', background: 'var(--surface)', borderRadius: 'var(--r)', fontSize: 13, color: 'var(--text2)', lineHeight: 1.7 }}>
+            <strong style={{ color: 'var(--text)' }}>Demo accounts</strong><br/>
+            Admin: admin@demo.com / admin123<br/>
+            Member: member@demo.com / member123
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ─── SIDEBAR ─── */
+const Sidebar = ({ page, setPage, user, onLogout }) => {
+  const { data } = useContext(AppCtx);
+  const myProjects = data.projects.filter(p => p.members.includes(user.id));
+  const navItems = [
+    { id: 'dashboard', icon: 'M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z', label: 'Dashboard' },
+    { id: 'projects', icon: 'M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z', label: 'Projects' },
+    { id: 'tasks', icon: 'M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11', label: 'All Tasks' },
+    ...(user.role === 'Admin' ? [{ id: 'team', icon: 'M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75', label: 'Team' }] : []),
+  ];
+
+  return (
+    <div style={{ width: 240, background: 'var(--bg2)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', flexShrink: 0, height: '100vh', position: 'sticky', top: 0 }}>
+      <div style={{ padding: '20px 16px 12px', borderBottom: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg width="15" height="15" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+          </div>
+          <span style={{ fontWeight: 700, fontSize: 16, letterSpacing: -0.4 }}>TaskFlow</span>
+        </div>
+      </div>
+      <nav style={{ padding: '12px 8px', flex: 1, overflow: 'auto' }}>
+        {navItems.map(n => (
+          <button key={n.id} onClick={() => setPage(n.id)} style={{
+            display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '9px 12px',
+            borderRadius: 'var(--r)', background: page === n.id ? 'var(--accent-soft)' : 'transparent',
+            color: page === n.id ? 'var(--accent)' : 'var(--text2)', fontWeight: page === n.id ? 600 : 400,
+            fontSize: 14, marginBottom: 2, textAlign: 'left', transition: 'all 0.12s', border: 'none', cursor: 'pointer'
+          }}>
+            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d={n.icon}/></svg>
+            {n.label}
+          </button>
+        ))}
+        {myProjects.length > 0 && (
+          <div style={{ marginTop: 20 }}>
+            <p style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', letterSpacing: 0.8, textTransform: 'uppercase', padding: '0 12px', marginBottom: 8 }}>My Projects</p>
+            {myProjects.map(p => (
+              <button key={p.id} onClick={() => setPage('project_' + p.id)} style={{
+                display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '8px 12px',
+                borderRadius: 'var(--r)', background: page === 'project_' + p.id ? 'var(--surface2)' : 'transparent',
+                color: page === 'project_' + p.id ? 'var(--text)' : 'var(--text2)', fontSize: 13,
+                textAlign: 'left', transition: 'all 0.12s', border: 'none', cursor: 'pointer', marginBottom: 2
+              }}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: p.color, flexShrink: 0 }}/>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </nav>
+      <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <Avatar user={user} size={34} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontSize: 13, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.name}</p>
+            <p style={{ fontSize: 11, color: 'var(--text2)' }}>{user.role}</p>
+          </div>
+          <button onClick={onLogout} title="Sign out" style={{ background: 'none', color: 'var(--text3)', padding: 4, borderRadius: 'var(--r)' }}>
+            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ─── TASK CARD ─── */
+const TaskCard = ({ task, onEdit, onDelete, user, compact }) => {
+  const { data } = useContext(AppCtx);
+  const assignee = data.users.find(u => u.id === task.assigneeId);
+  const overdue = isOverdue(task);
+
+  return (
+    <div style={{
+      background: 'var(--surface)', border: `1px solid ${overdue ? 'rgba(248,113,113,0.25)' : 'var(--border)'}`,
+      borderRadius: 'var(--r2)', padding: compact ? '12px 14px' : '14px 16px', marginBottom: 8,
+      transition: 'border-color 0.15s', cursor: 'pointer'
+    }} onClick={() => onEdit && onEdit(task)}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
+            <span style={{ fontSize: 14, fontWeight: 500, color: task.status === 'Done' ? 'var(--text2)' : 'var(--text)', textDecoration: task.status === 'Done' ? 'line-through' : 'none' }}>{task.title}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <Badge label={task.status} bg={STATUS_BG[task.status]} color={STATUS_TEXT[task.status]} />
+            <Badge label={task.priority} bg={PRIORITY_BG[task.priority]} color={PRIORITY_COLOR[task.priority]} />
+            {overdue && <Badge label="Overdue" bg="var(--red-soft)" color="var(--red)" />}
+            {task.dueDate && <span style={{ fontSize: 12, color: overdue ? 'var(--red)' : 'var(--text3)' }}>Due {task.dueDate}</span>}
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {assignee && <Avatar user={assignee} size={28} />}
+          {(user.role === 'Admin' || task.createdBy === user.id) && onDelete && (
+            <button onClick={e => { e.stopPropagation(); onDelete(task.id); }} style={{ background: 'none', color: 'var(--text3)', padding: 4, borderRadius: 4, fontSize: 16 }}>×</button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ─── TASK MODAL ─── */
+const TaskModal = ({ task, projectId, onClose, user }) => {
+  const { data, setData } = useContext(AppCtx);
+  const isNew = !task;
+  const [form, setForm] = useState(task || { title: '', description: '', status: 'Todo', priority: 'Medium', assigneeId: user.id, dueDate: '', projectId: projectId || data.projects[0]?.id });
+  const canEdit = user.role === 'Admin' || !task || task.createdBy === user.id || task.assigneeId === user.id;
+
+  const save = () => {
+    if (!form.title.trim()) return;
+    setData(d => {
+      const tasks = isNew
+        ? [...d.tasks, { ...form, id: uid(), createdBy: user.id, createdAt: Date.now() }]
+        : d.tasks.map(t => t.id === task.id ? { ...t, ...form } : t);
+      return { ...d, tasks };
+    });
+    onClose();
+  };
+
+  const proj = data.projects.find(p => p.id === (form.projectId || projectId));
+  const members = proj ? data.users.filter(u => proj.members.includes(u.id)) : data.users;
+
+  return (
+    <Modal title={isNew ? 'Create Task' : 'Edit Task'} onClose={onClose}>
+      <Field label="Title"><input value={form.title} onChange={e => setForm(f => ({...f, title: e.target.value}))} disabled={!canEdit} placeholder="Task title..." /></Field>
+      <Field label="Description"><textarea value={form.description} onChange={e => setForm(f => ({...f, description: e.target.value}))} disabled={!canEdit} rows={3} style={{ resize: 'vertical' }} placeholder="Optional description..." /></Field>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <Field label="Status">
+          <select value={form.status} onChange={e => setForm(f => ({...f, status: e.target.value}))} disabled={!canEdit}>
+            {['Todo','In Progress','Done'].map(s => <option key={s}>{s}</option>)}
+          </select>
+        </Field>
+        <Field label="Priority">
+          <select value={form.priority} onChange={e => setForm(f => ({...f, priority: e.target.value}))} disabled={!canEdit}>
+            {['High','Medium','Low'].map(s => <option key={s}>{s}</option>)}
+          </select>
+        </Field>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <Field label="Assignee">
+          <select value={form.assigneeId} onChange={e => setForm(f => ({...f, assigneeId: e.target.value}))} disabled={!canEdit}>
+            {members.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+          </select>
+        </Field>
+        <Field label="Due Date"><input type="date" value={form.dueDate} onChange={e => setForm(f => ({...f, dueDate: e.target.value}))} disabled={!canEdit} /></Field>
+      </div>
+      {isNew && user.role === 'Admin' && (
+        <Field label="Project">
+          <select value={form.projectId} onChange={e => setForm(f => ({...f, projectId: e.target.value}))}>
+            {data.projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </Field>
+      )}
+      {canEdit && (
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
+          <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+          <Btn onClick={save}>{isNew ? 'Create Task' : 'Save Changes'}</Btn>
+        </div>
+      )}
+    </Modal>
+  );
+};
+
+/* ─── PROJECT MODAL ─── */
+const ProjectModal = ({ project, onClose, user }) => {
+  const { data, setData } = useContext(AppCtx);
+  const isNew = !project;
+  const [form, setForm] = useState(project || { name: '', description: '', color: '#5b8fff', members: [user.id] });
+  const COLORS = ['#5b8fff','#34d399','#a78bfa','#fbbf24','#f87171','#38bdf8','#fb923c','#e879f9'];
+
+  const toggleMember = id => {
+    if (id === user.id) return;
+    setForm(f => ({ ...f, members: f.members.includes(id) ? f.members.filter(m => m !== id) : [...f.members, id] }));
+  };
+
+  const save = () => {
+    if (!form.name.trim()) return;
+    setData(d => {
+      const projects = isNew
+        ? [...d.projects, { ...form, id: uid(), createdBy: user.id, createdAt: Date.now() }]
+        : d.projects.map(p => p.id === project.id ? { ...p, ...form } : p);
+      return { ...d, projects };
+    });
+    onClose();
+  };
+
+  return (
+    <Modal title={isNew ? 'New Project' : 'Edit Project'} onClose={onClose}>
+      <Field label="Project Name"><input value={form.name} onChange={e => setForm(f => ({...f, name: e.target.value}))} placeholder="Project name..." /></Field>
+      <Field label="Description"><textarea value={form.description} onChange={e => setForm(f => ({...f, description: e.target.value}))} rows={2} style={{ resize: 'none' }} /></Field>
+      <Field label="Color">
+        <div style={{ display: 'flex', gap: 8 }}>
+          {COLORS.map(c => (
+            <button key={c} onClick={() => setForm(f => ({...f, color: c}))} style={{
+              width: 28, height: 28, borderRadius: '50%', background: c, border: `3px solid ${form.color === c ? '#fff' : 'transparent'}`, outline: form.color === c ? `2px solid ${c}` : 'none', cursor: 'pointer'
+            }}/>
+          ))}
+        </div>
+      </Field>
+      <Field label="Team Members">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {data.users.map(u => (
+            <button key={u.id} onClick={() => toggleMember(u.id)} style={{
+              display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 'var(--r)',
+              background: form.members.includes(u.id) ? 'var(--accent-soft)' : 'var(--surface)',
+              border: `1px solid ${form.members.includes(u.id) ? 'var(--accent)' : 'var(--border)'}`,
+              cursor: u.id === user.id ? 'default' : 'pointer'
+            }}>
+              <Avatar user={u} size={28} />
+              <div style={{ flex: 1, textAlign: 'left' }}>
+                <p style={{ fontSize: 13, fontWeight: 500 }}>{u.name} {u.id === user.id && '(you)'}</p>
+                <p style={{ fontSize: 12, color: 'var(--text2)' }}>{u.role}</p>
+              </div>
+              {form.members.includes(u.id) && <svg width="16" height="16" fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>}
+            </button>
+          ))}
+        </div>
+      </Field>
+      <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
+        <Btn variant="ghost" onClick={onClose}>Cancel</Btn>
+        <Btn onClick={save}>{isNew ? 'Create Project' : 'Save Changes'}</Btn>
+      </div>
+    </Modal>
+  );
+};
+
+/* ─── DASHBOARD ─── */
+const Dashboard = ({ user }) => {
+  const { data, setData } = useContext(AppCtx);
+  const [taskModal, setTaskModal] = useState(false);
+  const [editTask, setEditTask] = useState(null);
+
+  const myTasks = data.tasks.filter(t => t.assigneeId === user.id);
+  const allTasks = user.role === 'Admin' ? data.tasks : myTasks;
+  const overdueTasks = allTasks.filter(isOverdue);
+  const inProgress = allTasks.filter(t => t.status === 'In Progress');
+  const done = allTasks.filter(t => t.status === 'Done');
+  const todo = allTasks.filter(t => t.status === 'Todo');
+  const myProjects = data.projects.filter(p => p.members.includes(user.id));
+
+  const deleteTask = id => setData(d => ({ ...d, tasks: d.tasks.filter(t => t.id !== id) }));
+
+  const StatCard = ({ label, value, color = 'var(--accent)', sub }) => (
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r2)', padding: '16px 20px' }}>
+      <p style={{ fontSize: 12, color: 'var(--text2)', marginBottom: 8, fontWeight: 500 }}>{label}</p>
+      <p style={{ fontSize: 28, fontWeight: 700, color, letterSpacing: -1 }}>{value}</p>
+      {sub && <p style={{ fontSize: 12, color: 'var(--text3)', marginTop: 4 }}>{sub}</p>}
+    </div>
+  );
+
+  return (
+    <div style={{ padding: 32, maxWidth: 900, margin: '0 auto' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
+        <div>
+          <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: -0.5 }}>Good day, {user.name.split(' ')[0]} 👋</h1>
+          <p style={{ color: 'var(--text2)', fontSize: 14, marginTop: 4 }}>{new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+        </div>
+        <Btn onClick={() => setTaskModal(true)}>+ New Task</Btn>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 28 }}>
+        <StatCard label="Total Tasks" value={allTasks.length} sub={`${myTasks.length} assigned to me`} />
+        <StatCard label="In Progress" value={inProgress.length} color="var(--accent)" />
+        <StatCard label="Completed" value={done.length} color="var(--green)" />
+        <StatCard label="Overdue" value={overdueTasks.length} color={overdueTasks.length > 0 ? 'var(--red)' : 'var(--green)'} />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+        <div>
+          <h2 style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>My Tasks</h2>
+          {myTasks.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '32px 20px', background: 'var(--surface)', borderRadius: 'var(--r2)', color: 'var(--text2)', fontSize: 14 }}>No tasks assigned to you</div>
+          ) : myTasks.slice(0, 5).map(t => (
+            <TaskCard key={t.id} task={t} user={user} onEdit={setEditTask} onDelete={deleteTask} compact />
+          ))}
+        </div>
+        <div>
+          <h2 style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>Overdue</h2>
+          {overdueTasks.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '32px 20px', background: 'var(--surface)', borderRadius: 'var(--r2)', color: 'var(--green)', fontSize: 14 }}>🎉 No overdue tasks!</div>
+          ) : overdueTasks.map(t => (
+            <TaskCard key={t.id} task={t} user={user} onEdit={setEditTask} onDelete={deleteTask} compact />
+          ))}
+          <h2 style={{ fontSize: 15, fontWeight: 600, marginBottom: 14, marginTop: 20 }}>Projects</h2>
+          {myProjects.map(p => {
+            const pTasks = data.tasks.filter(t => t.projectId === p.id);
+            const pDone = pTasks.filter(t => t.status === 'Done').length;
+            const pct = pTasks.length ? Math.round(pDone / pTasks.length * 100) : 0;
+            return (
+              <div key={p.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r2)', padding: '14px 16px', marginBottom: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <div style={{ width: 10, height: 10, borderRadius: '50%', background: p.color }}/>
+                  <span style={{ fontSize: 14, fontWeight: 500 }}>{p.name}</span>
+                  <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--text2)' }}>{pDone}/{pTasks.length}</span>
+                </div>
+                <div style={{ height: 4, background: 'var(--surface2)', borderRadius: 2, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: pct + '%', background: p.color, borderRadius: 2, transition: 'width 0.4s' }}/>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {taskModal && <TaskModal onClose={() => setTaskModal(false)} user={user} />}
+      {editTask && <TaskModal task={editTask} onClose={() => setEditTask(null)} user={user} />}
+    </div>
+  );
+};
+
+/* ─── PROJECTS PAGE ─── */
+const Projects = ({ user, setPage }) => {
+  const { data, setData } = useContext(AppCtx);
+  const [modal, setModal] = useState(false);
+  const [editProj, setEditProj] = useState(null);
+  const myProjects = user.role === 'Admin' ? data.projects : data.projects.filter(p => p.members.includes(user.id));
+
+  const deleteProject = id => {
+    if (!confirm('Delete this project and all its tasks?')) return;
+    setData(d => ({ ...d, projects: d.projects.filter(p => p.id !== id), tasks: d.tasks.filter(t => t.projectId !== id) }));
+  };
+
+  return (
+    <div style={{ padding: 32, maxWidth: 900, margin: '0 auto' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
+        <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: -0.5 }}>Projects</h1>
+        {user.role === 'Admin' && <Btn onClick={() => setModal(true)}>+ New Project</Btn>}
+      </div>
+      {myProjects.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text2)' }}>No projects yet.</div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+          {myProjects.map(p => {
+            const pTasks = data.tasks.filter(t => t.projectId === p.id);
+            const pDone = pTasks.filter(t => t.status === 'Done').length;
+            const pProg = pTasks.filter(t => t.status === 'In Progress').length;
+            const pct = pTasks.length ? Math.round(pDone / pTasks.length * 100) : 0;
+            const members = data.users.filter(u => p.members.includes(u.id));
+            return (
+              <div key={p.id} style={{
+                background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r3)',
+                padding: 20, cursor: 'pointer', transition: 'border-color 0.15s', position: 'relative', overflow: 'hidden'
+              }} onClick={() => setPage('project_' + p.id)}
+                onMouseEnter={e => e.currentTarget.style.borderColor = p.color + '60'}
+                onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
+              >
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: p.color }}/>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                  <h3 style={{ fontSize: 16, fontWeight: 600 }}>{p.name}</h3>
+                  {user.role === 'Admin' && (
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button onClick={e => { e.stopPropagation(); setEditProj(p); }} style={{ background: 'none', color: 'var(--text3)', padding: '4px 6px', borderRadius: 4, fontSize: 12 }}>Edit</button>
+                      <button onClick={e => { e.stopPropagation(); deleteProject(p.id); }} style={{ background: 'none', color: 'var(--red)', padding: '4px 6px', borderRadius: 4, fontSize: 12 }}>Del</button>
+                    </div>
+                  )}
+                </div>
+                <p style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 14, lineHeight: 1.5 }}>{p.description}</p>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+                  <Badge label={`${pTasks.length} tasks`} bg="var(--surface2)" color="var(--text2)" />
+                  <Badge label={`${pProg} active`} bg="var(--accent-soft)" color="var(--accent)" />
+                  <Badge label={`${pDone} done`} bg="var(--green-soft)" color="var(--green)" />
+                </div>
+                <div style={{ marginBottom: 14 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text2)', marginBottom: 6 }}>
+                    <span>Progress</span><span>{pct}%</span>
+                  </div>
+                  <div style={{ height: 5, background: 'var(--surface2)', borderRadius: 3, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: pct + '%', background: p.color, borderRadius: 3 }}/>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: -6 }}>
+                  {members.slice(0, 4).map((u, i) => (
+                    <div key={u.id} style={{ marginLeft: i === 0 ? 0 : -8, border: '2px solid var(--surface)' }}>
+                      <Avatar user={u} size={26} />
+                    </div>
+                  ))}
+                  {members.length > 4 && <span style={{ fontSize: 12, color: 'var(--text2)', marginLeft: 6 }}>+{members.length - 4}</span>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {modal && <ProjectModal onClose={() => setModal(false)} user={user} />}
+      {editProj && <ProjectModal project={editProj} onClose={() => setEditProj(null)} user={user} />}
+    </div>
+  );
+};
+
+/* ─── PROJECT DETAIL ─── */
+const ProjectDetail = ({ projectId, user }) => {
+  const { data, setData } = useContext(AppCtx);
+  const [taskModal, setTaskModal] = useState(false);
+  const [editTask, setEditTask] = useState(null);
+  const [filter, setFilter] = useState('All');
+  const project = data.projects.find(p => p.id === projectId);
+  if (!project) return <div style={{ padding: 32 }}>Project not found.</div>;
+
+  const allTasks = data.tasks.filter(t => t.projectId === projectId);
+  const filtered = filter === 'All' ? allTasks : allTasks.filter(t => t.status === filter);
+  const deleteTask = id => setData(d => ({ ...d, tasks: d.tasks.filter(t => t.id !== id) }));
+
+  const col = (status) => filtered.filter(t => t.status === status);
+  const COLS = ['Todo', 'In Progress', 'Done'];
+
+  return (
+    <div style={{ padding: 32 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
+        <div style={{ width: 14, height: 14, borderRadius: '50%', background: project.color }}/>
+        <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: -0.5 }}>{project.name}</h1>
+        <Btn onClick={() => setTaskModal(true)} size="sm">+ Task</Btn>
+      </div>
+      <p style={{ color: 'var(--text2)', fontSize: 14, marginBottom: 24, marginLeft: 26 }}>{project.description}</p>
+
+      <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+        {['All', ...COLS].map(s => (
+          <button key={s} onClick={() => setFilter(s)} style={{
+            padding: '6px 14px', borderRadius: 20, fontSize: 13, fontWeight: 500,
+            background: filter === s ? 'var(--accent)' : 'var(--surface)',
+            color: filter === s ? '#fff' : 'var(--text2)',
+            border: '1px solid ' + (filter === s ? 'transparent' : 'var(--border)'),
+            cursor: 'pointer'
+          }}>{s}</button>
+        ))}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+        {COLS.map(col_name => {
+          const tasks = filtered.filter(t => t.status === col_name);
+          return (
+            <div key={col_name} style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 'var(--r2)', padding: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: STATUS_TEXT[col_name] }}/>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: STATUS_TEXT[col_name] }}>{col_name}</span>
+                </div>
+                <Badge label={tasks.length} bg="var(--surface)" color="var(--text2)" />
+              </div>
+              {tasks.map(t => <TaskCard key={t.id} task={t} user={user} onEdit={setEditTask} onDelete={deleteTask} compact />)}
+              {tasks.length === 0 && <p style={{ fontSize: 13, color: 'var(--text3)', textAlign: 'center', padding: '20px 10px' }}>No tasks</p>}
+            </div>
+          );
+        })}
+      </div>
+
+      {taskModal && <TaskModal projectId={projectId} onClose={() => setTaskModal(false)} user={user} />}
+      {editTask && <TaskModal task={editTask} onClose={() => setEditTask(null)} user={user} />}
+    </div>
+  );
+};
+
+/* ─── ALL TASKS ─── */
+const AllTasks = ({ user }) => {
+  const { data, setData } = useContext(AppCtx);
+  const [taskModal, setTaskModal] = useState(false);
+  const [editTask, setEditTask] = useState(null);
+  const [filter, setFilter] = useState({ status: 'All', priority: 'All', project: 'All' });
+  const [search, setSearch] = useState('');
+
+  const myTasks = user.role === 'Admin' ? data.tasks : data.tasks.filter(t => t.assigneeId === user.id || t.createdBy === user.id);
+  const filtered = myTasks.filter(t => {
+    if (filter.status !== 'All' && t.status !== filter.status) return false;
+    if (filter.priority !== 'All' && t.priority !== filter.priority) return false;
+    if (filter.project !== 'All' && t.projectId !== filter.project) return false;
+    if (search && !t.title.toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  });
+
+  const deleteTask = id => setData(d => ({ ...d, tasks: d.tasks.filter(t => t.id !== id) }));
+
+  return (
+    <div style={{ padding: 32, maxWidth: 900, margin: '0 auto' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+        <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: -0.5 }}>All Tasks</h1>
+        <Btn onClick={() => setTaskModal(true)}>+ New Task</Btn>
+      </div>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search tasks..." style={{ width: 200 }} />
+        <select value={filter.status} onChange={e => setFilter(f => ({...f, status: e.target.value}))} style={{ width: 'auto' }}>
+          {['All','Todo','In Progress','Done'].map(s => <option key={s}>{s}</option>)}
+        </select>
+        <select value={filter.priority} onChange={e => setFilter(f => ({...f, priority: e.target.value}))} style={{ width: 'auto' }}>
+          {['All','High','Medium','Low'].map(s => <option key={s}>{s}</option>)}
+        </select>
+        <select value={filter.project} onChange={e => setFilter(f => ({...f, project: e.target.value}))} style={{ width: 'auto' }}>
+          <option value="All">All Projects</option>
+          {data.projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </select>
+      </div>
+      {filtered.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text2)' }}>No tasks found.</div>
+      ) : filtered.map(t => {
+        const proj = data.projects.find(p => p.id === t.projectId);
+        return (
+          <div key={t.id}>
+            {proj && <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, marginTop: 4 }}>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: proj.color }}/>
+              <span style={{ fontSize: 11, color: 'var(--text3)' }}>{proj.name}</span>
+            </div>}
+            <TaskCard task={t} user={user} onEdit={setEditTask} onDelete={deleteTask} />
+          </div>
+        );
+      })}
+      {taskModal && <TaskModal onClose={() => setTaskModal(false)} user={user} />}
+      {editTask && <TaskModal task={editTask} onClose={() => setEditTask(null)} user={user} />}
+    </div>
+  );
+};
+
+/* ─── TEAM PAGE ─── */
+const Team = ({ user }) => {
+  const { data, setData } = useContext(AppCtx);
+  const [addModal, setAddModal] = useState(false);
+  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'Member' });
+  const [err, setErr] = useState('');
+
+  const addUser = () => {
+    if (!form.name || !form.email || !form.password) { setErr('All fields required'); return; }
+    if (data.users.find(u => u.email === form.email)) { setErr('Email already exists'); return; }
+    const initials = form.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0,2);
+    const colors = ['#5b8fff','#34d399','#a78bfa','#fbbf24','#f87171','#38bdf8'];
+    setData(d => ({ ...d, users: [...d.users, { ...form, id: uid(), avatar: initials, color: colors[d.users.length % colors.length] }] }));
+    setAddModal(false); setForm({ name: '', email: '', password: '', role: 'Member' }); setErr('');
+  };
+
+  return (
+    <div style={{ padding: 32, maxWidth: 800, margin: '0 auto' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
+        <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: -0.5 }}>Team Members</h1>
+        <Btn onClick={() => setAddModal(true)}>+ Add Member</Btn>
+      </div>
+      {data.users.map(u => {
+        const uTasks = data.tasks.filter(t => t.assigneeId === u.id);
+        const done = uTasks.filter(t => t.status === 'Done').length;
+        const active = uTasks.filter(t => t.status === 'In Progress').length;
+        const overdue = uTasks.filter(isOverdue).length;
+        return (
+          <div key={u.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r2)', padding: '16px 20px', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 16 }}>
+            <Avatar user={u} size={44} />
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <span style={{ fontWeight: 600, fontSize: 15 }}>{u.name}</span>
+                <Badge label={u.role} bg={u.role === 'Admin' ? 'var(--accent-soft)' : 'var(--surface2)'} color={u.role === 'Admin' ? 'var(--accent)' : 'var(--text2)'} />
+              </div>
+              <p style={{ fontSize: 13, color: 'var(--text2)' }}>{u.email}</p>
+            </div>
+            <div style={{ display: 'flex', gap: 16, textAlign: 'center' }}>
+              <div><p style={{ fontSize: 18, fontWeight: 700, color: 'var(--accent)' }}>{active}</p><p style={{ fontSize: 11, color: 'var(--text3)' }}>Active</p></div>
+              <div><p style={{ fontSize: 18, fontWeight: 700, color: 'var(--green)' }}>{done}</p><p style={{ fontSize: 11, color: 'var(--text3)' }}>Done</p></div>
+              <div><p style={{ fontSize: 18, fontWeight: 700, color: overdue > 0 ? 'var(--red)' : 'var(--text3)' }}>{overdue}</p><p style={{ fontSize: 11, color: 'var(--text3)' }}>Overdue</p></div>
+            </div>
+            {u.id !== user.id && (
+              <select value={u.role} onChange={e => setData(d => ({ ...d, users: d.users.map(usr => usr.id === u.id ? { ...usr, role: e.target.value } : usr) }))} style={{ width: 'auto', padding: '6px 10px' }}>
+                <option>Admin</option><option>Member</option>
+              </select>
+            )}
+          </div>
+        );
+      })}
+      {addModal && (
+        <Modal title="Add Team Member" onClose={() => { setAddModal(false); setErr(''); }}>
+          <Field label="Full Name"><input value={form.name} onChange={e => setForm(f => ({...f, name: e.target.value}))} /></Field>
+          <Field label="Email"><input type="email" value={form.email} onChange={e => setForm(f => ({...f, email: e.target.value}))} /></Field>
+          <Field label="Password"><input type="password" value={form.password} onChange={e => setForm(f => ({...f, password: e.target.value}))} /></Field>
+          <Field label="Role">
+            <select value={form.role} onChange={e => setForm(f => ({...f, role: e.target.value}))}>
+              <option>Admin</option><option>Member</option>
+            </select>
+          </Field>
+          {err && <p style={{ color: 'var(--red)', fontSize: 13, marginBottom: 12 }}>{err}</p>}
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+            <Btn variant="ghost" onClick={() => setAddModal(false)}>Cancel</Btn>
+            <Btn onClick={addUser}>Add Member</Btn>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+};
+
+/* ─── APP ─── */
+function App() {
+  const [rawData, setRawData] = useState(initData);
+  const [user, setUser] = useState(null);
+  const [page, setPage] = useState('dashboard');
+
+  const setData = useCallback(updater => setRawData(d => {
+    const next = typeof updater === 'function' ? updater(d) : updater;
+    localStorage.setItem('taskflow_v2', JSON.stringify(next));
+    return next;
+  }), []);
+
+  const logout = () => { setUser(null); setPage('dashboard'); };
+
+  const renderPage = () => {
+    if (page.startsWith('project_')) return <ProjectDetail projectId={page.replace('project_', '')} user={user} />;
+    switch (page) {
+      case 'dashboard': return <Dashboard user={user} />;
+      case 'projects': return <Projects user={user} setPage={setPage} />;
+      case 'tasks': return <AllTasks user={user} />;
+      case 'team': return user.role === 'Admin' ? <Team user={user} /> : <Dashboard user={user} />;
+      default: return <Dashboard user={user} />;
+    }
+  };
+
+  return (
+    <AppCtx.Provider value={{ data: rawData, setData }}>
+      {!user ? <Login onLogin={setUser} /> : (
+        <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+          <Sidebar page={page} setPage={setPage} user={user} onLogout={logout} />
+          <div style={{ flex: 1, overflow: 'auto' }}>{renderPage()}</div>
+        </div>
+      )}
+    </AppCtx.Provider>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
